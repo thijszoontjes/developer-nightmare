@@ -68,47 +68,63 @@ async function readPageState() {
 function setAlmostAligned(enabled, amount) {
   const styleId = "__almost_aligned_style__";
   const cameoId = "__almost_aligned_cameo__";
-  const wasEnabled = Boolean(document.getElementById(styleId));
-  document.querySelectorAll("[data-almost-aligned]").forEach((element) => {
-    element.removeAttribute("data-almost-aligned");
-    element.style.removeProperty("--almost-aligned-x");
-    element.style.removeProperty("--almost-aligned-y");
-    element.style.removeProperty("--almost-aligned-angle");
-  });
-  document.getElementById(styleId)?.remove();
-  document.getElementById(cameoId)?.remove();
+  const alreadyEnabled = Boolean(document.getElementById(styleId));
+  if (!enabled) {
+    document.querySelectorAll("[data-almost-aligned]").forEach((element) => {
+      element.removeAttribute("data-almost-aligned");
+      element.style.removeProperty("--almost-aligned-x");
+      element.style.removeProperty("--almost-aligned-y");
+      element.style.removeProperty("--almost-aligned-angle");
+      delete element.dataset.almostAlignedFactorX;
+      delete element.dataset.almostAlignedFactorY;
+      delete element.dataset.almostAlignedFactorAngle;
+    });
+    document.getElementById(styleId)?.remove();
+    document.getElementById(cameoId)?.remove();
+    return false;
+  }
 
-  if (!enabled) return false;
-
-  const style = document.createElement("style");
-  style.id = styleId;
-  style.textContent = `[data-almost-aligned] {
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `[data-almost-aligned] {
     translate: var(--almost-aligned-x) var(--almost-aligned-y) !important;
     rotate: var(--almost-aligned-angle) !important;
   }`;
-  document.documentElement.append(style);
+    document.documentElement.append(style);
+  }
 
   const requestedPixels = Number(amount);
   const maxPixels = Number.isFinite(requestedPixels)
     ? Math.max(0, Math.min(5, requestedPixels))
     : 2;
-  if (maxPixels === 0) return true;
-  const maxAngle = Math.min(0.4, maxPixels * 0.08);
+  const maxAngle = Math.min(0.15, maxPixels * 0.03);
   const targets = document.querySelectorAll("h1,h2,h3,p,li,a,button,input,img,blockquote,td,th");
-  for (const element of targets) {
-    if (Math.random() < 0.58) continue;
-    const bounds = element.getBoundingClientRect();
-    if (bounds.width < 8 || bounds.height < 8) continue;
 
-    const offset = () => `${((Math.random() * 2 - 1) * maxPixels).toFixed(1)}px`;
-    const angle = `${((Math.random() * 2 - 1) * maxAngle).toFixed(2)}deg`;
-    element.style.setProperty("--almost-aligned-x", offset());
-    element.style.setProperty("--almost-aligned-y", offset());
-    element.style.setProperty("--almost-aligned-angle", angle);
-    element.setAttribute("data-almost-aligned", "");
+  if (!alreadyEnabled) {
+    for (const element of targets) {
+      if (Math.random() < 0.58) continue;
+      const bounds = element.getBoundingClientRect();
+      if (bounds.width < 8 || bounds.height < 8) continue;
+      element.dataset.almostAlignedFactorX = String(Math.random() * 2 - 1);
+      element.dataset.almostAlignedFactorY = String(Math.random() * 2 - 1);
+      element.dataset.almostAlignedFactorAngle = String(Math.random() * 2 - 1);
+      element.setAttribute("data-almost-aligned", "");
+    }
   }
 
-  if (!wasEnabled && Math.random() < 0.01) {
+  document.querySelectorAll("[data-almost-aligned]").forEach((element) => {
+    if (element.dataset.almostAlignedFactorX === undefined) {
+      element.dataset.almostAlignedFactorX = String(Math.random() * 2 - 1);
+      element.dataset.almostAlignedFactorY = String(Math.random() * 2 - 1);
+      element.dataset.almostAlignedFactorAngle = String(Math.random() * 2 - 1);
+    }
+    element.style.setProperty("--almost-aligned-x", `${Number(element.dataset.almostAlignedFactorX) * maxPixels}px`);
+    element.style.setProperty("--almost-aligned-y", `${Number(element.dataset.almostAlignedFactorY) * maxPixels}px`);
+    element.style.setProperty("--almost-aligned-angle", `${Number(element.dataset.almostAlignedFactorAngle) * maxAngle}deg`);
+  });
+
+  if (!alreadyEnabled && maxPixels > 0 && Math.random() < 0.01) {
     const cameo = document.createElement("div");
     cameo.id = cameoId;
     cameo.setAttribute("role", "status");
@@ -166,48 +182,27 @@ toggleButton.addEventListener("click", async () => {
   updateButton();
 });
 
-intensity.addEventListener("input", () => {
+intensity.addEventListener("input", async () => {
   intensityValue.value = `${Number(intensity.value).toFixed(1)} px`;
   updateButton();
-  if (pageAvailable && Number(intensity.value) === 0) {
-    statusText.textContent = "At 0 px, the effect is off.";
-  } else if (pageAvailable && !applied) {
+  if (!pageAvailable) return;
+  if (!applied) {
     statusText.textContent = "Only affects the current tab.";
-  }
-});
-
-intensity.addEventListener("change", async () => {
-  if (tabId === undefined || !pageAvailable) return;
-  if (Number(intensity.value) === 0) {
-    if (applied) {
-      try {
-        const [result] = await chrome.scripting.executeScript({
-          target: { tabId },
-          func: setAlmostAligned,
-          args: [false, 0]
-        });
-        applied = Boolean(result?.result);
-        updateButton();
-      } catch {
-        pageAvailable = false;
-        statusText.textContent = "Could not update this page. Try refreshing it.";
-        updateButton();
-        return;
-      }
-    }
-    statusText.textContent = "At 0 px, the effect is off.";
     return;
   }
-  if (!applied) return;
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
       func: setAlmostAligned,
       args: [true, Number(intensity.value)]
     });
-    statusText.textContent = "Effect updated on this tab.";
+    statusText.textContent = Number(intensity.value) === 0
+      ? "At 0 px, the page looks normal. Increase the slider to preview."
+      : "Live preview on this tab.";
   } catch {
+    pageAvailable = false;
     statusText.textContent = "Could not update this page. Try refreshing it.";
+    updateButton();
   }
 });
 
