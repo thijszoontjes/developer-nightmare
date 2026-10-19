@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Almost Aligned</title>
+    <link rel="stylesheet" href="popup.css">
+    <script type="module" src="popup.js"></script>
+  </head>
+  <body>
+    <main class="popup">
+      <header class="brand">
+        <img class="brand-icon" src="icons/icon48.png" alt="">
+        <div>
+          <p class="eyebrow">A TINY WEB PRANK</p>
+          <h1>Almost Aligned</h1>
+        </div>
+      </header>
+
+      <p class="intro">Nudge a few page elements just enough to make everything feel a little off.</p>
+
+      <section class="controls" aria-labelledby="intensity-label">
+        <div class="range-heading">
+          <label id="intensity-label" for="intensity">How off?</label>
+          <output id="intensity-value" for="intensity">2 px</output>
+        </div>
+        <input id="intensity" type="range" min="1" max="5" step="1" value="2">
+        <div class="range-labels" aria-hidden="true"><span>Subtle</span><span>Obvious</span></div>
+
+        <button id="toggle" class="toggle" type="button" disabled>Loading…</button>
+        <p id="status" class="status" role="status" aria-live="polite">Only affects the current tab.</p>
+      </section>
+
+      <section id="sponsor-card" class="sponsor" aria-label="Sponsored" hidden>
+        <p class="sponsor-label">Sponsored</p>
+        <a id="sponsor-link" class="sponsor-link" target="_blank" rel="noopener noreferrer sponsored">
+          <strong id="sponsor-headline"></strong>
+          <span id="sponsor-description"></span>
+        </a>
+      </section>
+
+      <footer class="footer">
+        <a id="support-link" class="support-link" target="_blank" rel="noopener noreferrer" hidden>☕ Leave a voluntary tip</a>
+        <p class="note">Changes are temporary and local to this tab. Refresh the page or turn the effect off to reset it.</p>
+      </footer>
+    </main>
+  </body>
+</html>
