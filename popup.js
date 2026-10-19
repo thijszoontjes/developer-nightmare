@@ -8,8 +8,11 @@ const textDrift = document.querySelector("#text-drift");
 const supportLink = document.querySelector("#support-link");
 const sponsorCard = document.querySelector("#sponsor-card");
 let tabId;
-let applied = false;
+let effectActive = false;
 let pageAvailable = false;
+let effectRevision = 0;
+let pendingEffect = null;
+let syncingEffect = false;
 
 function httpsUrl(value) {
   try {
@@ -38,12 +41,10 @@ function configureMonetization() {
 
 function updateButton() {
   const intensityIsZero = Number(intensity.value) === 0;
-  toggleButton.disabled = !pageAvailable || (!applied && intensityIsZero);
-  toggleButton.textContent = applied
-    ? "Put it back"
-    : intensityIsZero ? "Choose an intensity above 0" : "Make it a little off";
-  toggleButton.classList.toggle("is-active", applied);
-  toggleButton.setAttribute("aria-pressed", String(applied));
+  toggleButton.disabled = !pageAvailable || (!effectActive && intensityIsZero);
+  toggleButton.textContent = effectActive ? "Reset" : "Apply";
+  toggleButton.classList.toggle("is-active", effectActive);
+  toggleButton.setAttribute("aria-pressed", String(effectActive));
 }
 
 async function readPageState() {
@@ -56,10 +57,10 @@ async function readPageState() {
       target: { tabId },
       func: () => Boolean(document.getElementById("__almost_aligned_style__"))
     });
-    applied = Boolean(result?.result);
+    effectActive = Boolean(result?.result);
     pageAvailable = true;
   } catch {
-    applied = false;
+    effectActive = false;
     pageAvailable = false;
     statusText.textContent = "Chrome does not allow extensions on this page.";
   }
@@ -176,58 +177,67 @@ function setAlmostAligned(enabled, amount, shiftText) {
   return true;
 }
 
-toggleButton.addEventListener("click", async () => {
-  if (tabId === undefined || !pageAvailable) return;
-  toggleButton.disabled = true;
-  try {
-    const [result] = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: setAlmostAligned,
-      args: [!applied, Number(intensity.value), textDrift.checked]
-    });
-    applied = Boolean(result?.result);
-    statusText.textContent = applied
-      ? "Effect active. Drag the slider to preview it live."
-      : "Page restored.";
-  } catch {
-    pageAvailable = false;
-    statusText.textContent = "Could not change this page. Try refreshing it.";
-  }
-  updateButton();
-});
-
-async function previewEffect() {
-  if (!applied || !pageAvailable || tabId === undefined) return;
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: setAlmostAligned,
-      args: [true, Number(intensity.value), textDrift.checked]
-    });
-    statusText.textContent = Number(intensity.value) === 0
-      ? "At 0 px, the page looks normal. Increase the slider to preview."
-      : "Live preview on this tab.";
-  } catch {
-    pageAvailable = false;
-    statusText.textContent = "Could not update this page. Try refreshing it.";
-    updateButton();
-  }
+function queueEffect(enabled, amount, shiftText) {
+  pendingEffect = { enabled, amount, shiftText, revision: ++effectRevision };
+  if (!syncingEffect) void flushEffectQueue();
 }
 
-intensity.addEventListener("input", async () => {
+async function flushEffectQueue() {
+  syncingEffect = true;
+  while (pendingEffect) {
+    const request = pendingEffect;
+    pendingEffect = null;
+    try {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: setAlmostAligned,
+        args: [request.enabled, request.amount, request.shiftText]
+      });
+      if (request.revision !== effectRevision) continue;
+      effectActive = Boolean(result?.result);
+      updateButton();
+      statusText.textContent = effectActive
+        ? Number(request.amount) === 0
+          ? "At 0 px, the page looks normal. Increase the slider to preview."
+          : "Live preview on this tab."
+        : "Page restored.";
+    } catch {
+      if (request.revision !== effectRevision) continue;
+      pageAvailable = false;
+      effectActive = false;
+      updateButton();
+      statusText.textContent = "Could not update this page. Try refreshing it.";
+    }
+  }
+  syncingEffect = false;
+}
+
+toggleButton.addEventListener("click", () => {
+  if (tabId === undefined || !pageAvailable) return;
+  effectActive = !effectActive;
+  updateButton();
+  statusText.textContent = effectActive ? "Applying effect…" : "Restoring page…";
+  queueEffect(effectActive, Number(intensity.value), textDrift.checked);
+});
+
+intensity.addEventListener("input", () => {
   intensityValue.value = `${Number(intensity.value).toFixed(1)} px`;
   updateButton();
   if (!pageAvailable) return;
-  if (!applied) {
+  if (!effectActive) {
     statusText.textContent = "Only affects the current tab.";
     return;
   }
-  await previewEffect();
+  statusText.textContent = "Updating live preview…";
+  queueEffect(true, Number(intensity.value), textDrift.checked);
 });
 
-textDrift.addEventListener("change", async () => {
+textDrift.addEventListener("change", () => {
   localStorage.setItem("almost-aligned-text-drift", String(textDrift.checked));
-  if (applied) await previewEffect();
+  if (effectActive) {
+    statusText.textContent = "Updating live preview…";
+    queueEffect(true, Number(intensity.value), textDrift.checked);
+  }
 });
 
 const savedIntensityText = localStorage.getItem("almost-aligned-intensity");
@@ -241,5 +251,5 @@ intensity.addEventListener("change", () => localStorage.setItem("almost-aligned-
 
 configureMonetization();
 readPageState().then(() => {
-  if (pageAvailable && !applied) statusText.textContent = "Only affects the current tab.";
+  if (pageAvailable && !effectActive) statusText.textContent = "Only affects the current tab.";
 });

@@ -6,7 +6,7 @@ A tiny Chrome prank that nudges a few elements on the current page by a handful 
 
 ## Features
 
-- Apply or undo the effect with one click.
+- Apply the effect or reset the page with one click.
 - Preview intensity changes live while dragging the slider; selected elements keep their positions as the effect scales.
 - Set the intensity from 0.0 to 15.0 pixels in 0.1-pixel steps.
 - Optionally add a separate horizontal nudge to selected text.
