@@ -4,6 +4,7 @@ const toggleButton = document.querySelector("#toggle");
 const statusText = document.querySelector("#status");
 const intensity = document.querySelector("#intensity");
 const intensityValue = document.querySelector("#intensity-value");
+const textDrift = document.querySelector("#text-drift");
 const supportLink = document.querySelector("#support-link");
 const sponsorCard = document.querySelector("#sponsor-card");
 let tabId;
@@ -65,7 +66,7 @@ async function readPageState() {
   updateButton();
 }
 
-function setAlmostAligned(enabled, amount) {
+function setAlmostAligned(enabled, amount, shiftText) {
   const styleId = "__almost_aligned_style__";
   const cameoId = "__almost_aligned_cameo__";
   const alreadyEnabled = Boolean(document.getElementById(styleId));
@@ -75,9 +76,11 @@ function setAlmostAligned(enabled, amount) {
       element.style.removeProperty("--almost-aligned-x");
       element.style.removeProperty("--almost-aligned-y");
       element.style.removeProperty("--almost-aligned-angle");
+      element.style.removeProperty("--almost-aligned-text-x");
       delete element.dataset.almostAlignedFactorX;
       delete element.dataset.almostAlignedFactorY;
       delete element.dataset.almostAlignedFactorAngle;
+      delete element.dataset.almostAlignedFactorTextX;
     });
     document.getElementById(styleId)?.remove();
     document.getElementById(cameoId)?.remove();
@@ -88,7 +91,7 @@ function setAlmostAligned(enabled, amount) {
     const style = document.createElement("style");
     style.id = styleId;
     style.textContent = `[data-almost-aligned] {
-    translate: var(--almost-aligned-x) var(--almost-aligned-y) !important;
+    translate: calc(var(--almost-aligned-x) + var(--almost-aligned-text-x, 0px)) var(--almost-aligned-y) !important;
     rotate: var(--almost-aligned-angle) !important;
   }`;
     document.documentElement.append(style);
@@ -96,19 +99,23 @@ function setAlmostAligned(enabled, amount) {
 
   const requestedPixels = Number(amount);
   const maxPixels = Number.isFinite(requestedPixels)
-    ? Math.max(0, Math.min(5, requestedPixels))
+    ? Math.max(0, Math.min(15, requestedPixels))
     : 2;
-  const maxAngle = Math.min(0.15, maxPixels * 0.03);
+  const maxAngle = Math.min(0.4, maxPixels * 0.04);
   const targets = document.querySelectorAll("h1,h2,h3,p,li,a,button,input,img,blockquote,td,th");
+  const textTargets = new Set(document.querySelectorAll("h1,h2,h3,p,li,a,button,blockquote,td,th"));
 
   if (!alreadyEnabled) {
     for (const element of targets) {
-      if (Math.random() < 0.58) continue;
+      if (Math.random() < 0.4) continue;
       const bounds = element.getBoundingClientRect();
       if (bounds.width < 8 || bounds.height < 8) continue;
       element.dataset.almostAlignedFactorX = String(Math.random() * 2 - 1);
       element.dataset.almostAlignedFactorY = String(Math.random() * 2 - 1);
       element.dataset.almostAlignedFactorAngle = String(Math.random() * 2 - 1);
+      if (textTargets.has(element)) {
+        element.dataset.almostAlignedFactorTextX = String(Math.random() * 2 - 1);
+      }
       element.setAttribute("data-almost-aligned", "");
     }
   }
@@ -119,9 +126,16 @@ function setAlmostAligned(enabled, amount) {
       element.dataset.almostAlignedFactorY = String(Math.random() * 2 - 1);
       element.dataset.almostAlignedFactorAngle = String(Math.random() * 2 - 1);
     }
+    if (element.dataset.almostAlignedFactorTextX === undefined && textTargets.has(element)) {
+      element.dataset.almostAlignedFactorTextX = String(Math.random() * 2 - 1);
+    }
     element.style.setProperty("--almost-aligned-x", `${Number(element.dataset.almostAlignedFactorX) * maxPixels}px`);
     element.style.setProperty("--almost-aligned-y", `${Number(element.dataset.almostAlignedFactorY) * maxPixels}px`);
     element.style.setProperty("--almost-aligned-angle", `${Number(element.dataset.almostAlignedFactorAngle) * maxAngle}deg`);
+    const textOffset = shiftText && element.dataset.almostAlignedFactorTextX !== undefined
+      ? Number(element.dataset.almostAlignedFactorTextX) * maxPixels * 0.75
+      : 0;
+    element.style.setProperty("--almost-aligned-text-x", `${textOffset}px`);
   });
 
   if (!alreadyEnabled && maxPixels > 0 && Math.random() < 0.01) {
@@ -169,11 +183,11 @@ toggleButton.addEventListener("click", async () => {
     const [result] = await chrome.scripting.executeScript({
       target: { tabId },
       func: setAlmostAligned,
-      args: [!applied, Number(intensity.value)]
+      args: [!applied, Number(intensity.value), textDrift.checked]
     });
     applied = Boolean(result?.result);
     statusText.textContent = applied
-      ? "Effect active on this tab. Refresh to reset it."
+      ? "Effect active. Drag the slider to preview it live."
       : "Page restored.";
   } catch {
     pageAvailable = false;
@@ -182,19 +196,13 @@ toggleButton.addEventListener("click", async () => {
   updateButton();
 });
 
-intensity.addEventListener("input", async () => {
-  intensityValue.value = `${Number(intensity.value).toFixed(1)} px`;
-  updateButton();
-  if (!pageAvailable) return;
-  if (!applied) {
-    statusText.textContent = "Only affects the current tab.";
-    return;
-  }
+async function previewEffect() {
+  if (!applied || !pageAvailable || tabId === undefined) return;
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
       func: setAlmostAligned,
-      args: [true, Number(intensity.value)]
+      args: [true, Number(intensity.value), textDrift.checked]
     });
     statusText.textContent = Number(intensity.value) === 0
       ? "At 0 px, the page looks normal. Increase the slider to preview."
@@ -204,13 +212,30 @@ intensity.addEventListener("input", async () => {
     statusText.textContent = "Could not update this page. Try refreshing it.";
     updateButton();
   }
+}
+
+intensity.addEventListener("input", async () => {
+  intensityValue.value = `${Number(intensity.value).toFixed(1)} px`;
+  updateButton();
+  if (!pageAvailable) return;
+  if (!applied) {
+    statusText.textContent = "Only affects the current tab.";
+    return;
+  }
+  await previewEffect();
+});
+
+textDrift.addEventListener("change", async () => {
+  localStorage.setItem("almost-aligned-text-drift", String(textDrift.checked));
+  if (applied) await previewEffect();
 });
 
 const savedIntensityText = localStorage.getItem("almost-aligned-intensity");
 const savedIntensity = Number(savedIntensityText);
-if (savedIntensityText !== null && Number.isFinite(savedIntensity) && savedIntensity >= 0 && savedIntensity <= 5) {
+if (savedIntensityText !== null && Number.isFinite(savedIntensity) && savedIntensity >= 0 && savedIntensity <= 15) {
   intensity.value = String(savedIntensity);
 }
+textDrift.checked = localStorage.getItem("almost-aligned-text-drift") === "true";
 intensityValue.value = `${Number(intensity.value).toFixed(1)} px`;
 intensity.addEventListener("change", () => localStorage.setItem("almost-aligned-intensity", intensity.value));
 

@@ -67,6 +67,19 @@ input[type="range"] {
 
 .range-labels { display: flex; justify-content: space-between; color: #8d909e; font-size: 10px; }
 
+.text-drift-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 13px;
+  color: #d8d8df;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.text-drift-option input { margin: 0; accent-color: #ff9666; }
+.option-note { margin: 5px 0 0 22px; color: #8d909e; font-size: 9px; line-height: 1.4; }
+
 .toggle {
   width: 100%;
   min-height: 40px;

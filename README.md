@@ -8,7 +8,8 @@ A tiny Chrome prank that nudges a few elements on the current page by a handful 
 
 - Apply or undo the effect with one click.
 - Preview intensity changes live while dragging the slider; selected elements keep their positions as the effect scales.
-- Set the intensity from 0.0 to 5.0 pixels in 0.1-pixel steps.
+- Set the intensity from 0.0 to 15.0 pixels in 0.1-pixel steps.
+- Optionally add a separate horizontal nudge to selected text.
 - A one-in-100 chance of a brief John Cena text cameo when the effect is enabled.
 - No analytics, remote scripts, or collection of browsing data.
 - Optional voluntary tip link and one clearly labelled sponsor card in the extension popup.
@@ -24,7 +25,7 @@ A tiny Chrome prank that nudges a few elements on the current page by a handful 
 
 Chrome does not allow extensions to change some pages, including its own settings and store pages. Refreshing the current page also resets the effect.
 
-The effect samples headings (`h1`–`h3`), paragraphs, list items, links, buttons, inputs, images, blockquotes, and table cells. About 42% of matching elements are nudged at random; elements smaller than 8 pixels in either dimension are skipped.
+The effect samples headings (`h1`–`h3`), paragraphs, list items, links, buttons, inputs, images, blockquotes, and table cells. About 60% of matching elements are nudged at random; elements smaller than 8 pixels in either dimension are skipped. Translation is capped at 15 pixels per axis and rotation at 0.4 degrees.
 
 ## Add a tip link or sponsor
 

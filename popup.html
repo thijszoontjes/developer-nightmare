@@ -24,8 +24,14 @@
           <label id="intensity-label" for="intensity">How off?</label>
           <output id="intensity-value" for="intensity">2 px</output>
         </div>
-        <input id="intensity" type="range" min="0" max="5" step="0.1" value="2">
-        <div class="range-labels" aria-hidden="true"><span>Off</span><span>Obvious</span></div>
+        <input id="intensity" type="range" min="0" max="15" step="0.1" value="2">
+        <div class="range-labels" aria-hidden="true"><span>Off</span><span>Chaos</span></div>
+
+        <label class="text-drift-option">
+          <input id="text-drift" type="checkbox">
+          <span>Extra horizontal text drift</span>
+        </label>
+        <p class="option-note">Adds a stronger left/right nudge to selected text.</p>
 
         <button id="toggle" class="toggle" type="button" disabled>Loading…</button>
         <p id="status" class="status" role="status" aria-live="polite">Only affects the current tab.</p>
