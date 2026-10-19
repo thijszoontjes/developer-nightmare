@@ -36,8 +36,11 @@ function configureMonetization() {
 }
 
 function updateButton() {
-  toggleButton.disabled = !pageAvailable;
-  toggleButton.textContent = applied ? "Put it back" : "Make it a little off";
+  const intensityIsZero = Number(intensity.value) === 0;
+  toggleButton.disabled = !pageAvailable || (!applied && intensityIsZero);
+  toggleButton.textContent = applied
+    ? "Put it back"
+    : intensityIsZero ? "Choose an intensity above 0" : "Make it a little off";
   toggleButton.classList.toggle("is-active", applied);
   toggleButton.setAttribute("aria-pressed", String(applied));
 }
@@ -85,7 +88,11 @@ function setAlmostAligned(enabled, amount) {
   }`;
   document.documentElement.append(style);
 
-  const maxPixels = Math.max(1, Math.min(5, Number(amount) || 2));
+  const requestedPixels = Number(amount);
+  const maxPixels = Number.isFinite(requestedPixels)
+    ? Math.max(0, Math.min(5, requestedPixels))
+    : 2;
+  if (maxPixels === 0) return true;
   const maxAngle = Math.min(0.4, maxPixels * 0.08);
   const targets = document.querySelectorAll("h1,h2,h3,p,li,a,button,input,img,blockquote,td,th");
   for (const element of targets) {
@@ -160,25 +167,56 @@ toggleButton.addEventListener("click", async () => {
 });
 
 intensity.addEventListener("input", () => {
-  intensityValue.value = `${intensity.value} px`;
+  intensityValue.value = `${Number(intensity.value).toFixed(1)} px`;
+  updateButton();
+  if (pageAvailable && Number(intensity.value) === 0) {
+    statusText.textContent = "At 0 px, the effect is off.";
+  } else if (pageAvailable && !applied) {
+    statusText.textContent = "Only affects the current tab.";
+  }
 });
 
 intensity.addEventListener("change", async () => {
-  if (tabId === undefined || !applied) return;
+  if (tabId === undefined || !pageAvailable) return;
+  if (Number(intensity.value) === 0) {
+    if (applied) {
+      try {
+        const [result] = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: setAlmostAligned,
+          args: [false, 0]
+        });
+        applied = Boolean(result?.result);
+        updateButton();
+      } catch {
+        pageAvailable = false;
+        statusText.textContent = "Could not update this page. Try refreshing it.";
+        updateButton();
+        return;
+      }
+    }
+    statusText.textContent = "At 0 px, the effect is off.";
+    return;
+  }
+  if (!applied) return;
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
       func: setAlmostAligned,
       args: [true, Number(intensity.value)]
     });
+    statusText.textContent = "Effect updated on this tab.";
   } catch {
     statusText.textContent = "Could not update this page. Try refreshing it.";
   }
 });
 
-const savedIntensity = Number(localStorage.getItem("almost-aligned-intensity"));
-if (savedIntensity >= 1 && savedIntensity <= 5) intensity.value = String(savedIntensity);
-intensityValue.value = `${intensity.value} px`;
+const savedIntensityText = localStorage.getItem("almost-aligned-intensity");
+const savedIntensity = Number(savedIntensityText);
+if (savedIntensityText !== null && Number.isFinite(savedIntensity) && savedIntensity >= 0 && savedIntensity <= 5) {
+  intensity.value = String(savedIntensity);
+}
+intensityValue.value = `${Number(intensity.value).toFixed(1)} px`;
 intensity.addEventListener("change", () => localStorage.setItem("almost-aligned-intensity", intensity.value));
 
 configureMonetization();
