@@ -1,4 +1,4 @@
-# Almost Aligned
+# Developer Nightmare
 
 A tiny Chrome prank that nudges a few elements on the current page by a handful of pixels. The effect is local to the open tab and disappears when you turn it off or refresh.
 

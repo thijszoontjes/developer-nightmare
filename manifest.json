@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Almost Aligned",
+  "name": "Developer Nightmare",
   "version": "1.0.0",
   "description": "Make the current webpage feel just slightly out of alignment.",
   "permissions": ["activeTab", "scripting"],
   "action": {
-    "default_title": "Almost Aligned",
+    "default_title": "Developer Nightmare",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
