@@ -42,9 +42,8 @@ function configureMonetization() {
 function updateButton() {
   const intensityIsZero = Number(intensity.value) === 0;
   toggleButton.disabled = !pageAvailable || (!effectActive && intensityIsZero);
-  toggleButton.textContent = effectActive ? "Reset" : "Apply";
+  toggleButton.textContent = "Apply";
   toggleButton.classList.toggle("is-active", effectActive);
-  toggleButton.setAttribute("aria-pressed", String(effectActive));
 }
 
 async function readPageState() {
@@ -67,27 +66,10 @@ async function readPageState() {
   updateButton();
 }
 
-function setAlmostAligned(enabled, amount, shiftText) {
+function setAlmostAligned(amount, shiftText) {
   const styleId = "__almost_aligned_style__";
   const cameoId = "__almost_aligned_cameo__";
   const alreadyEnabled = Boolean(document.getElementById(styleId));
-  if (!enabled) {
-    document.querySelectorAll("[data-almost-aligned]").forEach((element) => {
-      element.removeAttribute("data-almost-aligned");
-      element.style.removeProperty("--almost-aligned-x");
-      element.style.removeProperty("--almost-aligned-y");
-      element.style.removeProperty("--almost-aligned-angle");
-      element.style.removeProperty("--almost-aligned-text-x");
-      delete element.dataset.almostAlignedFactorX;
-      delete element.dataset.almostAlignedFactorY;
-      delete element.dataset.almostAlignedFactorAngle;
-      delete element.dataset.almostAlignedFactorTextX;
-    });
-    document.getElementById(styleId)?.remove();
-    document.getElementById(cameoId)?.remove();
-    return false;
-  }
-
   if (!document.getElementById(styleId)) {
     const style = document.createElement("style");
     style.id = styleId;
@@ -177,8 +159,8 @@ function setAlmostAligned(enabled, amount, shiftText) {
   return true;
 }
 
-function queueEffect(enabled, amount, shiftText) {
-  pendingEffect = { enabled, amount, shiftText, revision: ++effectRevision };
+function queueEffect(amount, shiftText) {
+  pendingEffect = { amount, shiftText, revision: ++effectRevision };
   if (!syncingEffect) void flushEffectQueue();
 }
 
@@ -191,16 +173,14 @@ async function flushEffectQueue() {
       const [result] = await chrome.scripting.executeScript({
         target: { tabId },
         func: setAlmostAligned,
-        args: [request.enabled, request.amount, request.shiftText]
+        args: [request.amount, request.shiftText]
       });
       if (request.revision !== effectRevision) continue;
       effectActive = Boolean(result?.result);
       updateButton();
-      statusText.textContent = effectActive
-        ? Number(request.amount) === 0
-          ? "At 0 px, the page looks normal. Increase the slider to preview."
-          : "Live preview on this tab."
-        : "Page restored.";
+      statusText.textContent = Number(request.amount) === 0
+        ? "At 0 px, the page looks normal. Increase the slider to preview."
+        : "Live preview on this tab.";
     } catch {
       if (request.revision !== effectRevision) continue;
       pageAvailable = false;
@@ -214,10 +194,10 @@ async function flushEffectQueue() {
 
 toggleButton.addEventListener("click", () => {
   if (tabId === undefined || !pageAvailable) return;
-  effectActive = !effectActive;
+  effectActive = true;
   updateButton();
-  statusText.textContent = effectActive ? "Applying effect…" : "Restoring page…";
-  queueEffect(effectActive, Number(intensity.value), textDrift.checked);
+  statusText.textContent = "Applying effect…";
+  queueEffect(Number(intensity.value), textDrift.checked);
 });
 
 intensity.addEventListener("input", () => {
@@ -229,14 +209,14 @@ intensity.addEventListener("input", () => {
     return;
   }
   statusText.textContent = "Updating live preview…";
-  queueEffect(true, Number(intensity.value), textDrift.checked);
+  queueEffect(Number(intensity.value), textDrift.checked);
 });
 
 textDrift.addEventListener("change", () => {
   localStorage.setItem("almost-aligned-text-drift", String(textDrift.checked));
   if (effectActive) {
     statusText.textContent = "Updating live preview…";
-    queueEffect(true, Number(intensity.value), textDrift.checked);
+    queueEffect(Number(intensity.value), textDrift.checked);
   }
 });
 
@@ -251,5 +231,7 @@ intensity.addEventListener("change", () => localStorage.setItem("almost-aligned-
 
 configureMonetization();
 readPageState().then(() => {
-  if (pageAvailable && !effectActive) statusText.textContent = "Only affects the current tab.";
+  if (pageAvailable) statusText.textContent = effectActive
+    ? "Live preview on this tab."
+    : "Only affects the current tab.";
 });
